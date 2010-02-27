@@ -54,3 +54,20 @@
 
 (defun select (selector-fn)
   (remove-if-not selector-fn *db*))
+
+(defun update (selector-fn &key title artist rating (ripped nil ripped-p))
+  (setf *db*
+	(mapcar
+	 #'(lambda (row)
+	     (when (funcall selector-fn row)
+	       (if title (setf (getf row :title) title))
+	       (if artist (setf (getf row :artist) artist))
+	       (if rating (setf (getf row :rating) rating))
+	       (if ripped-p (setf (getf row :ripped) ripped)))
+	     row) *db*)))5
+
+(defun delete (selector-fn)
+  (setf *db* (remove-if selector-fn *db*)))
+
+(defmacro backwards(expr)
+  (reverse expr))
