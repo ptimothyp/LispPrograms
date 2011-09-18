@@ -1,4 +1,4 @@
-
+(ql:quickload "cl-ppcre")
 (defpackage :com.pakkianathan.spam
   (:use :common-lisp :com.pakkianathan.pathnames))
 
@@ -12,10 +12,13 @@
 (defparameter *min-spam-score .6)
 
 (defun classification (score)
-  (cond
+  (values
+   (cond
     ((<= score *max-ham-score*) 'ham)
     ((>= score *min-spam-score) 'spam)
-    (t 'unsure)))
+    (t 'unsure))
+   score
+   ))
     
 (defclass word-feature ()
   ((word
@@ -116,4 +119,36 @@
    (* -2 (reduce #'+ probs :key #'log))
    (* 2 number-of-probs)))
 
+(defun inverse-chi-square (value degrees-of-freedom)
+  (assert (evenp degrees-of-freedom))
+  (min
+   (loop with m = (/ value 2)
+      for i below (/ degrees-of-freedom 2)
+      for prob = ( exp (- m)) then (* prob (/ m i))
+      summing prob)
+   1.0))
 
+
+(defparameter *corpus* (make-array 1000 :adjustable t :fill-pointer 0))
+
+(defun add-file-to-corpus (filename type corpus)
+  (vector-push-extend (list filename type) corpus))
+
+(defun add-directory-to-corpus (dir type corpus)
+  (dolist (filename (list-directory dir))
+    (add-file-to-corpus filename type corpus)))
+
+(defun test-classifier (corpus testing-fraction)
+  (clear-database)
+  (let* ((shuffled (shuffle-vector corpus))
+         (size (length corpus))
+         (train-on (floor (* size (- 1 testing-fraction)))))
+    (train-from-corpus shuffled :start 0 :end train-on)
+    (test-from-corpus shuffled :start train-on)))
+
+(defparameter *max-chars* (* 10 1024))
+
+(defun train-from-corpus (corpus &key (start 0) end)
+  (loop for idx from start below (or end (length corpus)) do
+       (destructuring-bind (file type) (aref corpus idx)
+         (train (start-of-file file *max-chars*) type))))
